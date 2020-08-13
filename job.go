@@ -418,7 +418,7 @@ func (j *Job) HasQueuedBuild() {
 	panic("Not Implemented yet")
 }
 
-func (j *Job) InvokeSimple(params map[string]string) (int64, error) {
+func (j *Job) InvokeSimple(params map[string]string, withOrigin bool) (int64, error) {
 	isQueued, err := j.IsQueued()
 	if err != nil {
 		return 0, err
@@ -429,16 +429,47 @@ func (j *Job) InvokeSimple(params map[string]string) (int64, error) {
 	}
 
 	endpoint := "/build"
-	parameters, err := j.GetParameters()
-	if err != nil {
-		return 0, err
-	}
-	if len(parameters) > 0 {
-		endpoint = "/buildWithParameters"
-	}
 	data := url.Values{}
-	for k, v := range params {
-		data.Set(k, v)
+	if withOrigin {
+		formParameterList := make([]map[string]interface{}, 0)
+		for k, v := range params {
+			if k != "jdk" {
+				formParameterList = append(formParameterList, map[string]interface{}{
+					"name":  k,
+					"value": v,
+				})
+			} else {
+				tmpMap := map[string]interface{}{"name": k}
+				jdkValMap := make(map[string]interface{})
+				err := json.Unmarshal([]byte(v), &jdkValMap)
+				if err != nil {
+					return 0, err
+				}
+				for key, val := range jdkValMap {
+					tmpMap[key] = val
+				}
+				formParameterList = append(formParameterList, tmpMap)
+			}
+		}
+		targetVal, err := json.Marshal(map[string][]map[string]interface{}{
+			"parameter": formParameterList,
+		})
+		if err != nil {
+			return 0, err
+		}
+		data.Set("json", string(targetVal))
+	} else {
+		parameters, err := j.GetParameters()
+		if err != nil {
+			return 0, err
+		}
+		if len(parameters) > 0 {
+			endpoint = "/buildWithParameters"
+		}
+
+		for k, v := range params {
+			data.Set(k, v)
+		}
 	}
 	resp, err := j.Jenkins.Requester.Post(j.Base+endpoint, bytes.NewBufferString(data.Encode()), nil, nil)
 	if err != nil {
