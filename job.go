@@ -490,12 +490,15 @@ func (j *Job) InvokeSimple(params map[string]string, withOrigin bool) (int64, er
 		return 0, err
 	}
 
-	number, err := strconv.ParseInt(path.Base(u.Path), 10, 64)
-	if err != nil {
-		return 0, err
+	if !withOrigin {
+		number, err := strconv.ParseInt(path.Base(u.Path), 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return number, nil
+	} else {
+		return 0, nil
 	}
-
-	return number, nil
 }
 
 func (j *Job) Invoke(files []string, skipIfRunning bool, params map[string]string, cause string, securityToken string) (bool, error) {
